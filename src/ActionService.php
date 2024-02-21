@@ -24,7 +24,7 @@ class ActionService
         }
     }
 
-    public static function action(FinTs $finTs, BaseAction $action)
+    public static function action(FinTs $finTs, BaseAction $action): void
     {
         $finTs->execute($action);
 
@@ -59,7 +59,7 @@ class ActionService
      */
     public static function handleStrongAuthentication(FinTs $finTs, BaseAction $action): void
     {
-        if ($finTs->getSelectedTanMode()?->isDecoupled()) {
+        if ($finTs->getSelectedTanMode()?->isDecoupled() === true) {
             self::handleDecoupled($finTs, $action);
         } else {
             self::handleTan($finTs, $action);
@@ -79,13 +79,14 @@ class ActionService
         if ($tanRequest?->getChallenge() !== null) {
             echo ' Instructions: ' . $tanRequest?->getChallenge();
         }
+
         echo "\n";
         if ($tanRequest?->getTanMediumName() !== null) {
             echo 'Please use this device: ' . $tanRequest?->getTanMediumName() . "\n";
         }
 
         // Challenge Image for PhotoTan/ChipTan
-        if ($tanRequest?->getChallengeHhdUc()) {
+        if ($tanRequest?->getChallengeHhdUc() instanceof \Fhp\Syntax\Bin) {
             try {
                 $flicker = new TanRequestChallengeFlicker($tanRequest?->getChallengeHhdUc());
                 echo 'There is a challenge flicker.' . PHP_EOL;
@@ -117,7 +118,7 @@ class ActionService
         echo "Please enter the TAN:\n";
         $tan = trim(fgets(STDIN));
 
-        echo "Submitting TAN: $tan\n";
+        echo sprintf('Submitting TAN: %s%s', $tan, PHP_EOL);
         $finTs->submitTan($action, $tan);
     }
 
@@ -135,6 +136,7 @@ class ActionService
         if ($tanRequest?->getChallenge() !== null) {
             echo ' Instructions: ' . $tanRequest?->getChallenge();
         }
+
         echo "\n";
         if ($tanRequest?->getTanMediumName() !== null) {
             echo 'Please check this device: ' . $tanRequest?->getTanMediumName() . "\n";
@@ -145,7 +147,7 @@ class ActionService
         // browser). This PHP sample code just serves to show the *logic* of the polling. Alternatively, you can even do
         // without polling entirely and just let the user confirm manually in all cases (i.e. only implement the `else`
         // branch below).
-        if ($tanMode?->allowsAutomatedPolling()) {
+        if ($tanMode?->allowsAutomatedPolling() === true) {
             echo "Polling server to detect when the decoupled authentication is complete.\n";
             sleep($tanMode?->getFirstDecoupledCheckDelaySeconds());
             for ($attempt = 0;
@@ -156,20 +158,24 @@ class ActionService
                     echo "Confirmed.\n";
                     return;
                 }
+
                 echo "Still waiting...\n";
                 sleep($tanMode?->getPeriodicDecoupledCheckDelaySeconds());
             }
-            throw new RuntimeException("Not confirmed after $attempt attempts, which is the limit.");
+
+            throw new RuntimeException(sprintf('Not confirmed after %d attempts, which is the limit.', $attempt));
         }
 
-        if ($tanMode?->allowsManualConfirmation()) {
+        if ($tanMode?->allowsManualConfirmation() === true) {
             do {
                 echo "Please type 'done' and hit Return when you've completed the authentication on the other device.\n";
                 while (trim(fgets(STDIN)) !== 'done') {
                     echo "Try again.\n";
                 }
+
                 echo "Confirming that the action is done.\n";
             } while (! $finTs->checkDecoupledSubmission($action));
+
             echo "Confirmed\n";
         } else {
             throw new AssertionError('Server allows neither automated polling nor manual confirmation');

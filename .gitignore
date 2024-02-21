@@ -4,3 +4,6 @@
 
 # ecs
 /.ecs-cache
+
+# rector
+/.rector-cache
