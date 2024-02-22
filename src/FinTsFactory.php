@@ -8,7 +8,7 @@ use Fhp\FinTs;
 use Fhp\Options\Credentials;
 use Fhp\Options\FinTsOptions;
 
-class FinTsCreator
+class FinTsFactory
 {
     public static function create(
         string $url,
