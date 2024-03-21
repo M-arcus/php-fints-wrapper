@@ -4,7 +4,8 @@
     "type": "library",
     "version": "1.0.1",
     "require": {
-        "nemiah/php-fints": "^3.4"
+        "nemiah/php-fints": "^3.4",
+        "symfony/console": "^7.0"
     },
     "license": "MIT",
     "autoload": {

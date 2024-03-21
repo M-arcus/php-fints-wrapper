@@ -12,24 +12,32 @@ use Fhp\Model\FlickerTan\TanRequestChallengeFlicker;
 use Fhp\Model\TanRequestChallengeImage;
 use InvalidArgumentException;
 use RuntimeException;
+use Symfony\Component\Console\Output\OutputInterface;
 
 class ActionService
 {
-    public static function login(FinTs $finTs): void
+    private ?OutputInterface $output;
+
+    public function setOutput(OutputInterface $output): void
+    {
+        $this->output = $output;
+    }
+
+    public function login(FinTs $finTs): void
     {
         $login = $finTs->login();
 
         if ($login->needsTan()) {
-            self::handleStrongAuthentication($finTs, $login);
+            $this->handleStrongAuthentication($finTs, $login);
         }
     }
 
-    public static function action(FinTs $finTs, BaseAction $action): void
+    public function action(FinTs $finTs, BaseAction $action): void
     {
         $finTs->execute($action);
 
         if ($action->needsTan()) {
-            self::handleStrongAuthentication($finTs, $action);
+            $this->handleStrongAuthentication($finTs, $action);
         }
     }
 
@@ -57,12 +65,12 @@ class ActionService
      *
      * @param BaseAction $action Some action that requires strong authentication.
      */
-    public static function handleStrongAuthentication(FinTs $finTs, BaseAction $action): void
+    public function handleStrongAuthentication(FinTs $finTs, BaseAction $action): void
     {
         if ($finTs->getSelectedTanMode()?->isDecoupled() === true) {
-            self::handleDecoupled($finTs, $action);
+            $this->handleDecoupled($finTs, $action);
         } else {
-            self::handleTan($finTs, $action);
+            $this->handleTan($finTs, $action);
         }
     }
 
@@ -71,39 +79,40 @@ class ActionService
      * application.
      * @param BaseAction $action Some action that requires a TAN.
      */
-    protected static function handleTan(FinTs $finTs, BaseAction $action): void
+    protected function handleTan(FinTs $finTs, BaseAction $action): void
     {
         // Find out what sort of TAN we need, tell the user about it.
         $tanRequest = $action->getTanRequest();
-        echo 'The bank requested a TAN.';
+        $this->output('The bank requested a TAN.');
         if ($tanRequest?->getChallenge() !== null) {
-            echo ' Instructions: ' . $tanRequest?->getChallenge();
+            $this->output(' Instructions: ' . $tanRequest?->getChallenge());
         }
 
-        echo "\n";
         if ($tanRequest?->getTanMediumName() !== null) {
-            echo 'Please use this device: ' . $tanRequest?->getTanMediumName() . "\n";
+            $this->output('Please use this device: ' . $tanRequest?->getTanMediumName());
         }
 
         // Challenge Image for PhotoTan/ChipTan
         if ($tanRequest?->getChallengeHhdUc() instanceof \Fhp\Syntax\Bin) {
             try {
                 $flicker = new TanRequestChallengeFlicker($tanRequest?->getChallengeHhdUc());
-                echo 'There is a challenge flicker.' . PHP_EOL;
+                $this->output('There is a challenge flicker.');
                 // save or output svg
                 $flickerPattern = $flicker->getFlickerPattern();
                 // other renderers can be implemented with this pattern
                 $svg = new SvgRenderer($flickerPattern);
-                echo $svg->getImage();
+                $this->output($svg->getImage());
             } catch (InvalidArgumentException) {
                 // was not a flicker
                 $challengeImage = new TanRequestChallengeImage($tanRequest?->getChallengeHhdUc());
-                echo 'There is a challenge image.' . PHP_EOL;
+                $this->output('There is a challenge image.');
                 // Save the challenge image somewhere
                 // Alternative: HTML sample code
-                echo '<img src="data:' . htmlspecialchars($challengeImage->getMimeType()) . ';base64,' . base64_encode(
-                    $challengeImage->getData()
-                ) . '" />' . PHP_EOL;
+                $this->output(
+                    '<img src="data:' . htmlspecialchars($challengeImage->getMimeType()) . ';base64,' . base64_encode(
+                        $challengeImage->getData()
+                    ) . '" />'
+                );
             }
         }
 
@@ -115,10 +124,10 @@ class ActionService
         // handling, not just one like in this simplified example). You *only* need to carry over the $persistedInstance
         // and the $persistedAction (which are simple strings) by storing them in some database or file where you can load
         // them again in a new PHP process when the user sends the TAN.
-        echo "Please enter the TAN:\n";
+        $this->output("Please enter the TAN:");
         $tan = trim(fgets(STDIN));
 
-        echo sprintf('Submitting TAN: %s%s', $tan, PHP_EOL);
+        $this->output(sprintf('Submitting TAN: %s', $tan));
         $finTs->submitTan($action, $tan);
     }
 
@@ -128,18 +137,17 @@ class ActionService
      * authentication at all, i.e. you could filter out any decoupled TanModes when letting the user choose.
      * @param BaseAction $action Some action that requires decoupled authentication.
      */
-    protected static function handleDecoupled(FinTs $finTs, BaseAction $action): void
+    protected function handleDecoupled(FinTs $finTs, BaseAction $action): void
     {
         $tanMode = $finTs->getSelectedTanMode();
         $tanRequest = $action->getTanRequest();
-        echo 'The bank requested authentication on another device.';
+        $this->output('The bank requested authentication on another device.');
         if ($tanRequest?->getChallenge() !== null) {
-            echo ' Instructions: ' . $tanRequest?->getChallenge();
+            $this->output(' Instructions: ' . $tanRequest?->getChallenge());
         }
 
-        echo "\n";
         if ($tanRequest?->getTanMediumName() !== null) {
-            echo 'Please check this device: ' . $tanRequest?->getTanMediumName() . "\n";
+            $this->output('Please check this device: ' . $tanRequest?->getTanMediumName());
         }
 
         // IMPORTANT: In your real application, you don't have to use sleep() in PHP. You can persist the state in the same
@@ -148,18 +156,18 @@ class ActionService
         // without polling entirely and just let the user confirm manually in all cases (i.e. only implement the `else`
         // branch below).
         if ($tanMode?->allowsAutomatedPolling() === true) {
-            echo "Polling server to detect when the decoupled authentication is complete.\n";
+            $this->output("Polling server to detect when the decoupled authentication is complete.");
             sleep($tanMode?->getFirstDecoupledCheckDelaySeconds());
             for ($attempt = 0;
                 $tanMode?->getMaxDecoupledChecks() === 0 || $attempt < $tanMode?->getMaxDecoupledChecks();
                 ++$attempt
             ) {
                 if ($finTs->checkDecoupledSubmission($action)) {
-                    echo "Confirmed.\n";
+                    $this->output("Confirmed.");
                     return;
                 }
 
-                echo "Still waiting...\n";
+                $this->output("Still waiting...");
                 sleep($tanMode?->getPeriodicDecoupledCheckDelaySeconds());
             }
 
@@ -168,17 +176,28 @@ class ActionService
 
         if ($tanMode?->allowsManualConfirmation() === true) {
             do {
-                echo "Please type 'done' and hit Return when you've completed the authentication on the other device.\n";
+                $this->output(
+                    "Please type 'done' and hit Return when you've completed the authentication on the other device."
+                );
                 while (trim(fgets(STDIN)) !== 'done') {
-                    echo "Try again.\n";
+                    $this->output("Try again.");
                 }
 
-                echo "Confirming that the action is done.\n";
+                $this->output("Confirming that the action is done.");
             } while (! $finTs->checkDecoupledSubmission($action));
 
-            echo "Confirmed\n";
+            $this->output("Confirmed");
         } else {
             throw new AssertionError('Server allows neither automated polling nor manual confirmation');
+        }
+    }
+
+    private function output(string $string): void
+    {
+        if ($this->output instanceof OutputInterface) {
+            $this->output->writeln($string);
+        } else {
+            echo $string . PHP_EOL;
         }
     }
 }
