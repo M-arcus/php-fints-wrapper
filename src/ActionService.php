@@ -23,21 +23,32 @@ class ActionService
         $this->output = $output;
     }
 
-    public function login(FinTs $finTs): void
+    public function login(FinTs $finTs, string $persistedInstanceFilePath = null): void
     {
         $login = $finTs->login();
 
         if ($login->needsTan()) {
             $this->handleStrongAuthentication($finTs, $login);
         }
+
+        $this->persist($finTs, $persistedInstanceFilePath);
     }
 
-    public function action(FinTs $finTs, BaseAction $action): void
+    public function action(FinTs $finTs, BaseAction $action, string $persistedInstanceFilePath = null): void
     {
         $finTs->execute($action);
 
         if ($action->needsTan()) {
             $this->handleStrongAuthentication($finTs, $action);
+        }
+
+        $this->persist($finTs, $persistedInstanceFilePath);
+    }
+
+    protected function persist(FinTs $finTs, string $persistedInstanceFilePath = null): void
+    {
+        if ($persistedInstanceFilePath !== null) {
+            file_put_contents($persistedInstanceFilePath, base64_encode($finTs->persist()));
         }
     }
 
