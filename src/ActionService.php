@@ -18,6 +18,11 @@ class ActionService
 {
     private ?OutputInterface $output;
 
+    public function __construct(OutputInterface $output = null)
+    {
+        $this->output = $output;
+    }
+
     public function setOutput(OutputInterface $output): void
     {
         $this->output = $output;
