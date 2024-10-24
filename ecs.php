@@ -10,13 +10,6 @@ return ECSConfig::configure()
     ->withCache(__DIR__ . '/.ecs-cache')
     ->withPreparedSets(
         psr12: true,
+        common: true,
         symplify: true,
-        arrays: true,
-        comments: true,
-        docblocks: true,
-        spaces: true,
-        namespaces: true,
-        phpunit: true,
-        strict: true,
-        cleanCode: true
     );
