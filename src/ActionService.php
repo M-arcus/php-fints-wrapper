@@ -41,20 +41,22 @@ class ActionService
 
     public function action(FinTs $finTs, BaseAction $action, string $persistedInstanceFilePath = null): void
     {
-        $finTs->execute($action);
+        try {
+            $finTs->execute($action);
 
-        if ($action->needsTan()) {
-            $this->handleStrongAuthentication($finTs, $action);
+            if ($action->needsTan()) {
+                $this->handleStrongAuthentication($finTs, $action);
+            }
+        } catch (\Throwable $exception) {
+            // If the action failed
+            // we still want to persist the FinTs instance
+            // because otherwise the next call will be broken
+            $this->persist($finTs, $persistedInstanceFilePath);
+
+            throw $exception;
         }
 
         $this->persist($finTs, $persistedInstanceFilePath);
-    }
-
-    protected function persist(FinTs $finTs, string $persistedInstanceFilePath = null): void
-    {
-        if ($persistedInstanceFilePath !== null) {
-            file_put_contents($persistedInstanceFilePath, base64_encode($finTs->persist()));
-        }
     }
 
     /**
@@ -87,6 +89,13 @@ class ActionService
             $this->handleDecoupled($finTs, $action);
         } else {
             $this->handleTan($finTs, $action);
+        }
+    }
+
+    protected function persist(FinTs $finTs, string $persistedInstanceFilePath = null): void
+    {
+        if ($persistedInstanceFilePath !== null) {
+            file_put_contents($persistedInstanceFilePath, base64_encode($finTs->persist()));
         }
     }
 
@@ -140,7 +149,7 @@ class ActionService
         // handling, not just one like in this simplified example). You *only* need to carry over the $persistedInstance
         // and the $persistedAction (which are simple strings) by storing them in some database or file where you can load
         // them again in a new PHP process when the user sends the TAN.
-        $this->output("Please enter the TAN:");
+        $this->output('Please enter the TAN:');
         $tan = trim(fgets(STDIN));
 
         $this->output(sprintf('Submitting TAN: %s', $tan));
@@ -172,18 +181,18 @@ class ActionService
         // without polling entirely and just let the user confirm manually in all cases (i.e. only implement the `else`
         // branch below).
         if ($tanMode?->allowsAutomatedPolling() === true) {
-            $this->output("Polling server to detect when the decoupled authentication is complete.");
+            $this->output('Polling server to detect when the decoupled authentication is complete.');
             sleep($tanMode?->getFirstDecoupledCheckDelaySeconds());
             for ($attempt = 0;
                 $tanMode?->getMaxDecoupledChecks() === 0 || $attempt < $tanMode?->getMaxDecoupledChecks();
                 ++$attempt
             ) {
                 if ($finTs->checkDecoupledSubmission($action)) {
-                    $this->output("Confirmed.");
+                    $this->output('Confirmed.');
                     return;
                 }
 
-                $this->output("Still waiting...");
+                $this->output('Still waiting...');
                 sleep($tanMode?->getPeriodicDecoupledCheckDelaySeconds());
             }
 
@@ -196,13 +205,13 @@ class ActionService
                     "Please type 'done' and hit Return when you've completed the authentication on the other device."
                 );
                 while (trim(fgets(STDIN)) !== 'done') {
-                    $this->output("Try again.");
+                    $this->output('Try again.');
                 }
 
-                $this->output("Confirming that the action is done.");
+                $this->output('Confirming that the action is done.');
             } while (! $finTs->checkDecoupledSubmission($action));
 
-            $this->output("Confirmed");
+            $this->output('Confirmed');
         } else {
             throw new AssertionError('Server allows neither automated polling nor manual confirmation');
         }
