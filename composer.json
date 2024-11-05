@@ -10,7 +10,7 @@
         }
     ],
     "require": {
-        "nemiah/php-fints": "^3.4",
+        "nemiah/php-fints": "*",
         "symfony/console": "^6 || ^7"
     },
     "require-dev": {
