@@ -11,7 +11,7 @@
     ],
     "require": {
         "nemiah/php-fints": "*",
-        "symfony/console": "^6 || ^7"
+        "symfony/console": "^6 || ^7 || ^8"
     },
     "require-dev": {
         "ergebnis/composer-normalize": "^2.44",
